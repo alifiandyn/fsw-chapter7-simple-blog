@@ -1,4 +1,6 @@
 const { Article } = require("../models");
+const fs = require("fs");
+const { Op } = require("sequelize");
 
 function customDateFormat(date) {
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -7,13 +9,50 @@ function customDateFormat(date) {
 }
 
 const home = async (req, res) => {
-  const articles = await Article.findAll();
+  const { success, error } = req.flash();
+  const page = Number(req.query.page) || 1;
+  const keyword = req.query.keyword || "";
+  const itemPerPage = 4;
+  const articles = await Article.findAndCountAll({
+    where: {
+      [Op.or]: [
+        {
+          titleArticle: {
+            [Op.iLike]: `%${keyword}%`,
+          },
+        },
+        {
+          bodyArticle: {
+            [Op.iLike]: `%${keyword}%`,
+          },
+        },
+        {
+          writer: {
+            [Op.iLike]: `%${keyword}%`,
+          },
+        },
+      ],
+    },
+    limit: itemPerPage,
+    offset: (page - 1) * itemPerPage,
+    order: [["createdAt", "DESC"]],
+  });
+  for (const item of articles.rows) {
+    item.dataValues.createdAt = customDateFormat(item.dataValues.createdAt);
+  }
   res.render("", {
-    data: articles,
+    data: articles.rows,
+    currentPage: page,
+    totalPage: Math.ceil(articles.count / itemPerPage),
+    nextPage: page + 1,
+    previousPage: page - 1 == 0 ? 1 : page - 1,
+    keyword: keyword,
+    success: success,
+    error: error,
   });
 };
 
-const post = async (req, res) => {
+const viewArticle = async (req, res) => {
   const idTitle = req.params.id;
   const articles = await Article.findOne({
     where: {
@@ -22,6 +61,20 @@ const post = async (req, res) => {
   });
   articleDate = customDateFormat(articles.createdAt);
   res.render("post", {
+    data: articles,
+    articleDate,
+  });
+};
+
+const editArticle = async (req, res) => {
+  const idTitle = req.params.id;
+  const articles = await Article.findOne({
+    where: {
+      uuid: idTitle,
+    },
+  });
+  articleDate = customDateFormat(articles.createdAt);
+  res.render("editArticle", {
     data: articles,
     articleDate,
   });
@@ -40,20 +93,106 @@ const writeArticle = (req, res) => {
 };
 
 const createArticle = async (req, res) => {
-  const { email, title, article } = req.body;
   try {
+    const { email, title, article } = req.body;
     const newArticle = await Article.create({
       writer: email,
       titleArticle: title,
       bodyArticle: article,
+      banner: req.file ? req.file.filename : null,
     });
     if (newArticle) {
+      req.flash("success", "Your article successfully created");
       res.redirect("/");
     }
   } catch (error) {
     console.log("====================================");
     console.log(error);
     console.log("====================================");
+    req.flash("error", error.message);
+    res.redirect("/");
+  }
+};
+
+const updateArticle = async (req, res) => {
+  try {
+    const { uuid, email, title, article } = req.body;
+    const oldArticle = await Article.findOne({
+      where: {
+        uuid: uuid,
+      },
+    });
+    if (!req.file) {
+      const newArticle = await oldArticle.update({
+        writer: email != "" ? email : oldArticle.writer,
+        titleArticle: title != "" ? title : oldArticle.titleArticle,
+        bodyArticle: article != "" ? article : oldArticle.bodyArticle,
+      });
+      if (newArticle) {
+        req.flash("success", "Your article successfully updated");
+        res.redirect("/");
+      }
+    } else {
+      const image = req.file.filename;
+      const newArticle = await Article.update(
+        {
+          writer: email != "" ? email : oldArticle.writer,
+          titleArticle: title != "" ? title : oldArticle.titleArticle,
+          bodyArticle: article != "" ? article : oldArticle.bodyArticle,
+          banner: image,
+        },
+        {
+          where: {
+            uuid: uuid,
+          },
+        }
+      );
+      if (oldArticle.banner != null) {
+        fs.rmSync(__dirname + "/../public/assets/img/" + oldArticle.banner);
+      }
+      if (newArticle) {
+        req.flash("success", "Your article successfully updated");
+        res.redirect("/");
+      }
+    }
+  } catch (error) {
+    console.log("====================================");
+    console.log(error);
+    console.log("====================================");
+    req.flash("error", error.message);
+    res.redirect("/");
+  }
+};
+
+const deleteArticle = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const oldArticle = await Article.findByPk(id);
+    if (oldArticle.banner != null) {
+      try {
+        fs.rmSync(__dirname + "/../public/assets/img/" + oldArticle.banner);
+      } catch (error) {
+        console.log(error);
+      }
+      await Article.destroy({
+        where: {
+          uuid: id,
+        },
+      });
+    } else {
+      await Article.destroy({
+        where: {
+          uuid: id,
+        },
+      });
+    }
+    req.flash("success", "Your article successfully deleted");
+    res.redirect("/");
+  } catch (error) {
+    console.log("====================================");
+    console.log(error);
+    console.log("====================================");
+    req.flash("error", error.message);
     res.redirect("/");
   }
 };
@@ -76,4 +215,4 @@ const createArticle = async (req, res) => {
 //     });
 // };
 
-module.exports = { home, post, about, contact, writeArticle, createArticle };
+module.exports = { home, about, contact, writeArticle, createArticle, viewArticle, editArticle, updateArticle, deleteArticle };

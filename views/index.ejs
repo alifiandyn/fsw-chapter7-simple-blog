@@ -23,8 +23,8 @@
         <div class="row gx-4 gx-lg-5 justify-content-center">
           <div class="col-md-10 col-lg-8 col-xl-7">
             <div class="site-heading">
-              <h1>Clean Blog</h1>
-              <span class="subheading">A Blog Theme by Start Bootstrap</span>
+              <h1>Free Write</h1>
+              <span class="subheading">Write here as you like and responsibly</span>
             </div>
           </div>
         </div>
@@ -34,6 +34,14 @@
     <div class="container px-4 px-lg-5">
       <div class="row gx-4 gx-lg-5 justify-content-center">
         <div class="col-md-10 col-lg-8 col-xl-7">
+          <% if (success) { %> <%- include('partial/successMessage', {message: success[0]}) %> <% } else if (error) { %> <%- include('partial/errorMessage', {message: error[0]}) %> <% } %>
+          <form class="row g-3" method="get" action="/">
+            <input type="hidden" name="page" value="1" />
+            <div class="input-group mb-3">
+              <input type="text" class="form-control" value="<%= keyword %>" name="keyword" placeholder="Search article by title, writer, or others" aria-label="Search article by title, writer, or others" aria-describedby="button-addon2" />
+              <button class="btn btn-primary" type="submit" id="button-addon2">Search</button>
+            </div>
+          </form>
           <% data.forEach(article => { %>
           <!-- Post preview-->
           <div class="post-preview">
@@ -47,11 +55,38 @@
               on <%= article.createdAt %>
             </p>
           </div>
+          <div class="btn-group btn-group-sm" role="group" aria-label="Basic mixed styles example">
+            <a type="button" class="btn btn-success" href="post/<%= article.uuid%>">View</a>
+            <a type="button" class="btn btn-warning" href="editArticle/<%= article.uuid%>">Edit</a>
+            <a type="button" class="btn btn-danger" href="deleteArticle/<%= article.uuid%>">Delete</a>
+          </div>
           <!-- Divider-->
           <hr class="my-4" />
           <% }) %>
           <!-- Pager-->
-          <div class="d-flex justify-content-end mb-4"><a class="btn btn-primary text-uppercase" href="#!">Older Posts →</a></div>
+          <div class="d-flex justify-content-end mb-4">
+            <!-- <a class="btn btn-primary text-uppercase" href="#!">Older Posts →</a> -->
+            <nav aria-label="...">
+              <ul class="pagination">
+                <li class="page-item <%= currentPage==1 ? 'disabled' : '' %>">
+                  <a class="page-link" href="?page=<%= previousPage %>&keyword=<%= keyword %>">Previous</a>
+                </li>
+                <!-- <li class="page-item"><a class="page-link" href="#">1</a></li>
+                <li class="page-item active" aria-current="page">
+                  <a class="page-link" href="#">2</a>
+                </li>
+                <li class="page-item"><a class="page-link" href="#">3</a></li> -->
+                <% for( let index = 1; index <= totalPage ; index++ ) { %>
+                <li class="page-item <%= index == currentPage ? 'active' : '' %>" aria-current="page">
+                  <a class="page-link" href="/?page=<%= index %>&keyword=<%= keyword %>"><%= index %> </a>
+                </li>
+                <% } %>
+                <li class="page-item <%= currentPage==totalPage || totalPage==0? 'disabled' : '' %>">
+                  <a class="page-link" href="?page=<%= nextPage %>&keyword=<%= keyword %>">Next</a>
+                </li>
+              </ul>
+            </nav>
+          </div>
         </div>
       </div>
     </div>
